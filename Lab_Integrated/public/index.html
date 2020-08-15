@@ -13,6 +13,12 @@
             text-align: center;
             font-size: 2em;
         }
+        .modal-delete {
+            background-color: crimson;
+            color: white;
+            text-align: center;
+            font-size: 2em;
+        }
 
         .modal-footer {
             background-color: #f9f9f9;
@@ -55,7 +61,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4>新增/修改</h4>
+                <h4><div id = textAdd style="display:inline">新增</div>/<div id = textEdit style="display:inline">修改</div></h4>
             </div>
             <div class="modal-body">
                 <form>
@@ -75,10 +81,9 @@
                             <span class="glyphicon glyphicon-time"></span>
                             日期
                         </label>
-                        <input type="text"
+                        <input type="date"
                                id="ymdTextBox"
-                               class="form-control"
-                               placeholder="yyyy-mm-dd 例如: 2017-05-20">
+                               class="form-control">
                     </div>
 
 
@@ -103,6 +108,26 @@
     </div>
 </div>
 <!-- /對話盒 -->
+<!-- /對話盒2-->
+<div id = "modalDelete" class="modal fade" tabindex="-1"  role="dialog">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header modal-delete">
+          <h4 class="modal-title modal-delete">WARNING! (ﾟдﾟ);</h4>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>確定刪除資料？</p>
+        </div>
+        <div class="modal-footer">
+          <button id = deleteModalBtn type="button" class="btn btn-danger">確定</button>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
 
 <!-- ========== UI 與 JavaScript 分隔線 ========== -->
@@ -121,8 +146,8 @@ function showToast(heading, message) {
     $.toast({
         text: message, // Text that is to be shown in the toast
         heading: heading, // Optional heading to be shown on the toast
-        icon: 'warning', // Type of toast icon
-        showHideTransition: 'fade', // fade, slide or plain
+        icon: heading, // Type of toast icon
+        showHideTransition: 'plain', // fade, slide or plain
         allowToastClose: true, // Boolean value true or false
         hideAfter: 3000, // false to make it sticky or number representing the miliseconds as time after which toast needs to be hidden
         stack: 5, // false if there should be only one toast at a time or a number representing the maximum number of toasts to be shown at a time
@@ -144,6 +169,7 @@ function showToast(heading, message) {
 
 $(function () {
     var currentIndex;
+    var deleteIndex;
     var newsList =[];
     refreshNews();   
     // 練習與任務:
@@ -163,12 +189,13 @@ $(function () {
             }console.log("refreshed.");
             //delete
             $(".deleteItem").click(function () {
-            let index = $(this).closest("li").index();
-            $.ajax({
-                type: "delete",
-                url: "/home/news",
-                data: newsList[index]
-                }).then(refreshNews);
+                $("#modalDelete").modal({backdrop: "static"});
+                deleteIndex = $(this).closest("li").index();
+            // $.ajax({
+            //     type: "delete",
+            //     url: "/home/news",
+            //     data: newsList[index]
+            //     }).then(refreshNews);
             })
             //edit
             $(".editItem").click(function(){
@@ -177,16 +204,20 @@ $(function () {
                 $("#newsModal").modal({backdrop: "static"})
                 $("#titleTextBox").val(newsList[currentIndex].title)
                 $("#ymdTextBox").val(newsList[currentIndex].ymd)
+                $("#textEdit").css("color","#FFFFFF");
+                $("#textAdd").css("color","#88b588");
+
             })
                 
         }) 
     }
+    //
     $("#newItem").on("click", function(){
         currentIndex = -1
         $("#newsModal").modal({backdrop: "static"});
         $("#ymdTextBox").val("");
         $("#titleTextBox").val("");
-
+        $("#textEdit").css("color","#88b588");
     })
     //insert
     $("#okButton").click(function(){
@@ -195,30 +226,64 @@ $(function () {
             ymd: $("#ymdTextBox").val(),
             title: $("#titleTextBox").val()
         }
-        console.log(insertData);
-        $.ajax({
-            type: "post",
-            url: "/home/news",
-            contentType: "application/json",
-            data: JSON.stringify(insertData)        
-            }).then(function(){
-                $("#newsModal").modal("hide");
-                refreshNews();
-            })
-        }else{
+            if (!ifDataNull(insertData)) {
+                $.ajax({
+                    type: "post",
+                    url: "/home/news",
+                    contentType: "application/json",
+                    data: JSON.stringify(insertData)
+                }).then(function () {
+                    $("#newsModal").modal("hide");
+                    showToast("success", "已經新增: " + insertData.title);
+                    refreshNews();
+                })
+            } else {
+                showToast("warning", "請輸入標題/日期");
+            }
+        }else{//update data
             newsList[currentIndex].ymd = $("#ymdTextBox").val();
             newsList[currentIndex].title = $("#titleTextBox").val();
-            $.ajax({
-            type: "put",
-            url: "/home/news",
-            data: newsList[currentIndex]        
-            }).then(function(){
-                console.log("edited.");
-                $("#newsModal").modal("hide");
-                refreshNews();
-            })
+            if (ifDataNull(newsList[currentIndex])) {
+                showToast("warning", "請輸入標題/日期");
+            } else {
+                $.ajax({
+                    type: "put",
+                    url: "/home/news",
+                    data: newsList[currentIndex]
+                }).then(function () {
+                    console.log("edited.");
+                    $("#newsModal").modal("hide");
+                    showToast("success", "修改完成");
+                    refreshNews();
+                })
+            }
+           
         }
     })
+    //delete
+    $("#deleteModalBtn").click(function(){
+        $("#modalDelete").modal("hide");
+        console.log("deleteIndex: "+deleteIndex);
+            $.ajax({
+                type: "delete",
+                url: "/home/news",
+                data: newsList[deleteIndex]
+                }).then(refreshNews);
+
+    })
+    //init newsModal after hidden
+    $("#newsModal").on('hidden.bs.modal',function(){
+        console.log("Modal hided");
+        $("#textAdd").css("color","#FFFFFF");
+        $("#textEdit").css("color","#FFFFFF");
+    })
+    //title & ymd not null
+    function ifDataNull(data){
+        if(data.ymd===""||data.title==="")
+            return true;
+        else
+            return false; 
+        }
     
 
 
